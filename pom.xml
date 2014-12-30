@@ -6,6 +6,7 @@
   <packaging>pom</packaging>
   <modules>
   	<module>sample-rpcclient</module>
+  	<module>sample-rpcserver</module>
   </modules>
   <dependencyManagement>
   	<dependencies>
