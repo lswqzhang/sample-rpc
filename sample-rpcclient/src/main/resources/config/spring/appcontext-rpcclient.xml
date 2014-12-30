@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-2.5.xsd">
+	
+	<bean id="hello" class="factory.RpcIfaceFactory" init-method="init">
+		<property name="url" value="http://localhost:8081/apis/hello/" />
+		<property name="iface" value="iface.Hello" />
+		<property name="user" value="client1" />
+		<property name="password" value="client1" />
+		<property name="overloadEnabled" value="true" />
+		<property name="debug" value="true" />
+	</bean>
+</beans>
