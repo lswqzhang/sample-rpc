@@ -8,6 +8,13 @@
   	<module>sample-rpcclient</module>
   	<module>sample-rpcserver</module>
   </modules>
+  
+  <properties>
+		<java.src.version>1.6</java.src.version>
+		<project.encoding>UTF-8</project.encoding>
+		<java.target.version>1.6</java.target.version>
+	</properties>
+  
   <dependencyManagement>
   	<dependencies>
   		<dependency>
@@ -20,6 +27,68 @@
   			<artifactId>hessian</artifactId>
   			<version>4.0.7</version>
   		</dependency>
+  		<dependency>
+  			<groupId>ch.qos.logback</groupId>
+  			<artifactId>logback-classic</artifactId>
+  			<version>1.1.2</version>
+  		</dependency>
+  		<dependency>
+  			<groupId>org.slf4j</groupId>
+  			<artifactId>slf4j-api</artifactId>
+  			<version>1.7.5</version>
+  		</dependency>
+  		<dependency>
+  			<groupId>org.apache.commons</groupId>
+  			<artifactId>commons-lang3</artifactId>
+  			<version>3.1</version>
+  		</dependency>
+  		<dependency>
+  			<groupId>dom4j</groupId>
+  			<artifactId>dom4j</artifactId>
+  			<version>1.6.1</version>
+  		</dependency>
+  		<dependency>
+  			<groupId>sample</groupId>
+  			<artifactId>sample-utils</artifactId>
+  			<version>0.0.1-SNAPSHOT</version>
+  		</dependency>
+  		<dependency>
+  			<groupId>commons-codec</groupId>
+  			<artifactId>commons-codec</artifactId>
+  			<version>1.7</version>
+  		</dependency>
+  		<dependency>
+  			<groupId>jaxen</groupId>
+  			<artifactId>jaxen</artifactId>
+  			<version>1.1.1</version>
+  		</dependency>
   	</dependencies>
   </dependencyManagement>
+  
+  <build>
+		<plugins>
+			<plugin>
+				<artifactId>maven-resources-plugin</artifactId>
+				<version>2.4.3</version>
+				<configuration>
+					<encoding>${project.encoding}</encoding>
+				</configuration>
+			</plugin>
+			<plugin>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<version>2.0.2</version>
+				<configuration>
+					<source>${java.src.version}</source>
+					<target>${java.target.version}</target>
+					<encoding>${project.encoding}</encoding>
+				</configuration>
+			</plugin>
+			<plugin>
+				<artifactId>maven-deploy-plugin</artifactId>
+				<configuration>
+					<updateReleaseInfo>true</updateReleaseInfo>
+				</configuration>
+			</plugin>
+		</plugins>
+	</build>
 </project>
