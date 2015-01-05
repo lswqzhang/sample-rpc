@@ -9,7 +9,7 @@ import org.springframework.context.support.ClassPathXmlApplicationContext;
  * createTime: Dec 30, 2014 1:44:29 PM
  */
 
-public class Main {
+public class ClientMain {
 
 	public static void main(String[] args){
 		ApplicationContext ctx = new ClassPathXmlApplicationContext("config/spring/appcontext-*.xml");
