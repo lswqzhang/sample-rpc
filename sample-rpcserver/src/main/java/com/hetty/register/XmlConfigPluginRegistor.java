@@ -1,8 +1,7 @@
-package com.hetty.plugin;
+package com.hetty.register;
 
 import java.util.List;
 
-import com.hetty.conf.HettyConfig;
 import com.hetty.conf.XmlConfigParser;
 import com.hetty.core.HettySecurity;
 import com.hetty.core.ServiceHandler;
@@ -10,11 +9,13 @@ import com.hetty.object.Application;
 import com.hetty.object.Service;
 import com.hetty.object.ServiceVersion;
 
-public class XmlConfigPlugin implements IPlugin{
+public class XmlConfigPluginRegistor implements IPlugin{
+	
+	private String configFile;
 
 	@Override
 	public boolean start() {
-		String configFile = HettyConfig.getInstance().getpropertiesFile();
+//		String configFile = HettyConfig.getInstance().getpropertiesFile();
 		String[] fileArr = configFile.split(",");
 		
 		for(String file:fileArr){
@@ -46,4 +47,12 @@ public class XmlConfigPlugin implements IPlugin{
 		return false;
 	}
 
+	public String getConfigFile() {
+		return configFile;
+	}
+
+	public void setConfigFile(String configFile) {
+		this.configFile = configFile;
+	}
+	
 }

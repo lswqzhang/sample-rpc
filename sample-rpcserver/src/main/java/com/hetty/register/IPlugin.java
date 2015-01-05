@@ -1,4 +1,4 @@
-package com.hetty.plugin;
+package com.hetty.register;
 /**
  * IPlugin
  */

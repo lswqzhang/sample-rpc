@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
-import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.SynchronousQueue;
@@ -17,12 +16,16 @@ import org.jboss.netty.bootstrap.ServerBootstrap;
 import org.jboss.netty.channel.socket.nio.NioServerSocketChannelFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.NoSuchBeanDefinitionException;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.support.ClassPathXmlApplicationContext;
 
 import com.hetty.conf.HettyConfig;
 import com.hetty.core.ssl.SslHettyChannelPipelineFactory;
 import com.hetty.object.Application;
 import com.hetty.object.HettyException;
-import com.hetty.plugin.IPlugin;
+import com.hetty.register.IPlugin;
+import com.hetty.register.XmlConfigPluginRegistor;
 
 import file.FileUtil;
 
@@ -36,15 +39,17 @@ public final class Hetty {
 	private HettyConfig hettyConfig = HettyConfig.getInstance();
 	private int httpListenPort;
 	private int httpsListenPort;
+	private ApplicationContext ctx;
 	
 	public Hetty(){
-		HettyConfig.getInstance().loadPropertyFile("server.properties");//default file is this.
+		HettyConfig.getInstance().loadPropertyFile("config/server.properties");//default file is this.
 	}
 	public Hetty(String file){
 		HettyConfig.getInstance().loadPropertyFile(file);
 	}
 	
 	private void init() {
+		ctx = new ClassPathXmlApplicationContext(new String[]{"classpath*:config/spring/appcontext-*.xml"});
 		initServerInfo();
 		initHettySecurity();
 		initPlugins();
@@ -131,6 +136,20 @@ public final class Hetty {
 	 */
 	private void initPlugins() {
 		logger.info("init plugins...........");
+		try{
+			IPlugin localPlugin = (XmlConfigPluginRegistor) ctx.getBean("localPlugin");
+			localPlugin.start();
+		}catch(NoSuchBeanDefinitionException ex){
+			logger.debug("no localPlugin bean defined");
+		}
+		
+		try{
+			IPlugin remotePlugin = (XmlConfigPluginRegistor) ctx.getBean("remotePlugin");
+			remotePlugin.start();
+		}catch(NoSuchBeanDefinitionException ex){
+			logger.debug("no remotePlugin bean defined");
+		}
+		/*
 		List<Class<?>> pluginList = hettyConfig.getPluginClassList();
 		try {
 			for (Class<?> cls : pluginList) {
@@ -146,7 +165,9 @@ public final class Hetty {
 			logger.error("init plugin failed.");
 			e.printStackTrace();
 		}
+		*/
 	}
+	
 	/**
 	 * init service metaData
 	 */
