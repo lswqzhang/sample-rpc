@@ -84,3 +84,9 @@ public static void main(String[] args) throws MalformedURLException {
 	System.out.println(basic.hello("guolei","hetty"));
 }
 ```
+
+
+shopbusiness-server的启动方式是：
+1. 配置ServiceRegister为一个bean，其property list是对应的Service
+2. 在ServiceRegister中实现一个init方法，这样Spring去call了init，在init中有
+3. ProviderBootStrap.init();其最终启动了一个JettyServer
