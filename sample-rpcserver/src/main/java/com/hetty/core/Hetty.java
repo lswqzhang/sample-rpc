@@ -1,5 +1,12 @@
 package com.hetty.core;
 
+import io.netty.bootstrap.ServerBootstrap;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelOption;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.nio.NioServerSocketChannel;
+
 import java.io.IOException;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
@@ -12,8 +19,6 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.StringUtils;
-import org.jboss.netty.bootstrap.ServerBootstrap;
-import org.jboss.netty.channel.socket.nio.NioServerSocketChannelFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
@@ -21,7 +26,6 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
 
 import com.hetty.conf.HettyConfig;
-import com.hetty.core.ssl.SslHettyChannelPipelineFactory;
 import com.hetty.object.Application;
 import com.hetty.object.HettyException;
 import com.hetty.register.IPlugin;
@@ -76,6 +80,32 @@ public final class Hetty {
 	 */
     private void initHttpBootstrap(){
     	logger.info("init HTTP Bootstrap...........");
+    	int coreSize = hettyConfig.getServerCorePoolSize();
+		int maxSize = hettyConfig.getServerMaximumPoolSize();
+		int keepAlive = hettyConfig.getServerKeepAliveTime();
+		ThreadFactory threadFactory = new NamedThreadFactory("hetty-");
+    	ExecutorService threadPool = new ThreadPoolExecutor(coreSize, maxSize, keepAlive,
+				TimeUnit.SECONDS, new SynchronousQueue<Runnable>(), threadFactory);
+    	
+    	
+    	EventLoopGroup boss = new NioEventLoopGroup();
+    	EventLoopGroup worker = new NioEventLoopGroup();
+    	ServerBootstrap httpBootStrap = new ServerBootstrap();
+    	try{
+	    	ChannelFuture cf = httpBootStrap.group(boss, worker)
+	    				 .channel(NioServerSocketChannel.class)
+	    				 .childHandler(new HettyServerHandlerInitializer(threadPool))
+	    				 .option(ChannelOption.SO_KEEPALIVE, true)
+	    				 .bind(new InetSocketAddress(httpListenPort));
+	    	
+	    	cf.channel().closeFuture().sync();
+    	}catch (InterruptedException e) {
+			e.printStackTrace();
+		} finally {
+			boss.shutdownGracefully();
+			worker.shutdownGracefully();
+		}
+    	/*
 		ThreadFactory serverBossTF = new NamedThreadFactory("HETTY-BOSS-");
 		ThreadFactory serverWorkerTF = new NamedThreadFactory("HETTY-WORKER-");
 		httpBootstrap = new ServerBootstrap(new NioServerSocketChannelFactory(
@@ -98,37 +128,38 @@ public final class Hetty {
 			throw new IllegalStateException("port: " + httpListenPort + " already in use!");
 		}
 		httpBootstrap.bind(new InetSocketAddress(httpListenPort));
+		*/
     }
     /**
 	 * init https bootstrap
 	 */
     private void initHttpsBootstrap(){
-    	if(!checkHttpsConfig()){
-    		return;
-    	}
-    	logger.info("init HTTPS Bootstrap...........");
-		ThreadFactory serverBossTF = new NamedThreadFactory("HETTY-BOSS-");
-		ThreadFactory serverWorkerTF = new NamedThreadFactory("HETTY-WORKER-");
-		httpsBootstrap = new ServerBootstrap(new NioServerSocketChannelFactory(
-				Executors.newCachedThreadPool(serverBossTF),
-				Executors.newCachedThreadPool(serverWorkerTF)));
-		httpsBootstrap.setOption("tcpNoDelay", Boolean.parseBoolean(hettyConfig
-				.getProperty("hetty.tcp.nodelay", "true")));
-		httpsBootstrap.setOption("reuseAddress", Boolean.parseBoolean(hettyConfig
-				.getProperty("hetty.tcp.reuseaddress", "true")));
-		
-		int coreSize = hettyConfig.getServerCorePoolSize();
-		int maxSize = hettyConfig.getServerMaximumPoolSize();
-		int keepAlive = hettyConfig.getServerKeepAliveTime();
-		ThreadFactory threadFactory = new NamedThreadFactory("hetty-");
-		ExecutorService threadPool = new ThreadPoolExecutor(coreSize, maxSize, keepAlive,
-				TimeUnit.SECONDS, new SynchronousQueue<Runnable>(), threadFactory);
-		httpsBootstrap.setPipelineFactory(new SslHettyChannelPipelineFactory(threadPool));
-		
-		if (!checkPortConfig(httpsListenPort)) {
-			throw new IllegalStateException("port: " + httpsListenPort + " already in use!");
-		}
-		httpsBootstrap.bind(new InetSocketAddress(httpsListenPort));
+//    	if(!checkHttpsConfig()){
+//    		return;
+//    	}
+//    	logger.info("init HTTPS Bootstrap...........");
+//		ThreadFactory serverBossTF = new NamedThreadFactory("HETTY-BOSS-");
+//		ThreadFactory serverWorkerTF = new NamedThreadFactory("HETTY-WORKER-");
+//		httpsBootstrap = new ServerBootstrap(new NioServerSocketChannelFactory(
+//				Executors.newCachedThreadPool(serverBossTF),
+//				Executors.newCachedThreadPool(serverWorkerTF)));
+//		httpsBootstrap.setOption("tcpNoDelay", Boolean.parseBoolean(hettyConfig
+//				.getProperty("hetty.tcp.nodelay", "true")));
+//		httpsBootstrap.setOption("reuseAddress", Boolean.parseBoolean(hettyConfig
+//				.getProperty("hetty.tcp.reuseaddress", "true")));
+//		
+//		int coreSize = hettyConfig.getServerCorePoolSize();
+//		int maxSize = hettyConfig.getServerMaximumPoolSize();
+//		int keepAlive = hettyConfig.getServerKeepAliveTime();
+//		ThreadFactory threadFactory = new NamedThreadFactory("hetty-");
+//		ExecutorService threadPool = new ThreadPoolExecutor(coreSize, maxSize, keepAlive,
+//				TimeUnit.SECONDS, new SynchronousQueue<Runnable>(), threadFactory);
+//		httpsBootstrap.setPipelineFactory(new SslHettyChannelPipelineFactory(threadPool));
+//		
+//		if (!checkPortConfig(httpsListenPort)) {
+//			throw new IllegalStateException("port: " + httpsListenPort + " already in use!");
+//		}
+//		httpsBootstrap.bind(new InetSocketAddress(httpsListenPort));
     }
 
 	/**
@@ -264,10 +295,10 @@ public final class Hetty {
 	public void stop(){
 		logger.info("Server stop!");
 		if(httpBootstrap != null){
-			httpBootstrap.releaseExternalResources();
+//			httpBootstrap.releaseExternalResources();
 		}
 		if(httpsBootstrap != null){
-			httpsBootstrap.releaseExternalResources();
+//			httpsBootstrap.releaseExternalResources();
 		}
 	}
 	public static void main(String[] args) {

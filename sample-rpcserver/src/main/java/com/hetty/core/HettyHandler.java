@@ -1,10 +1,25 @@
 package com.hetty.core;
 
-import static org.jboss.netty.handler.codec.http.HttpHeaders.isKeepAlive;
-import static org.jboss.netty.handler.codec.http.HttpHeaders.Names.CONTENT_LENGTH;
-import static org.jboss.netty.handler.codec.http.HttpHeaders.Names.CONTENT_TYPE;
-import static org.jboss.netty.handler.codec.http.HttpResponseStatus.CONTINUE;
-import static org.jboss.netty.handler.codec.http.HttpVersion.HTTP_1_1;
+import static io.netty.handler.codec.http.HttpHeaders.is100ContinueExpected;
+import static io.netty.handler.codec.http.HttpHeaders.isKeepAlive;
+import static io.netty.handler.codec.http.HttpHeaders.Names.CONNECTION;
+import static io.netty.handler.codec.http.HttpHeaders.Names.CONTENT_LENGTH;
+import static io.netty.handler.codec.http.HttpHeaders.Names.CONTENT_TYPE;
+import static io.netty.handler.codec.http.HttpResponseStatus.CONTINUE;
+import static io.netty.handler.codec.http.HttpVersion.HTTP_1_1;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpHeaders.Values;
+import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.util.CharsetUtil;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -19,20 +34,6 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 
 import org.apache.commons.codec.binary.Base64;
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.buffer.ChannelBuffers;
-import org.jboss.netty.channel.ChannelFuture;
-import org.jboss.netty.channel.ChannelFutureListener;
-import org.jboss.netty.channel.ChannelHandlerContext;
-import org.jboss.netty.channel.ExceptionEvent;
-import org.jboss.netty.channel.MessageEvent;
-import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
-import org.jboss.netty.handler.codec.http.DefaultHttpResponse;
-import org.jboss.netty.handler.codec.http.HttpHeaders;
-import org.jboss.netty.handler.codec.http.HttpRequest;
-import org.jboss.netty.handler.codec.http.HttpResponse;
-import org.jboss.netty.handler.codec.http.HttpResponseStatus;
-import org.jboss.netty.util.CharsetUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,13 +46,11 @@ import com.caucho.hessian.io.SerializerFactory;
 import com.caucho.services.server.ServiceContext;
 import com.hetty.object.RequestWrapper;
 
-public class HettyHandler extends SimpleChannelUpstreamHandler {
+public class HettyHandler extends SimpleChannelInboundHandler<Object> {
 	
 	private final Logger log = LoggerFactory
 			.getLogger(HettyHandler.class);
-	private HttpRequest request;
-	private boolean readingChunks;
-	private final StringBuilder buf = new StringBuilder();
+	private FullHttpRequest request;
 	private HessianInputFactory _inputFactory = new HessianInputFactory();
 	private HessianFactory _hessianFactory = new HessianFactory();
 
@@ -62,113 +61,58 @@ public class HettyHandler extends SimpleChannelUpstreamHandler {
 		this.threadpool = threadpool;
 	}
 	
-	@Override
-	public void exceptionCaught(ChannelHandlerContext ctx, ExceptionEvent e)
-			throws Exception {
-			if(!(e.getCause() instanceof IOException)){
-				log.error("catch some exception not IOException",e.getCause());
-			}
-		}
-
-	@Override
-	public void messageReceived(ChannelHandlerContext ctx, MessageEvent e)
-			throws Exception {
-		if (!readingChunks) {
-			ByteArrayOutputStream os = new ByteArrayOutputStream();
-			HttpRequest request = this.request = (HttpRequest) e.getMessage();
-			HttpResponse response = new DefaultHttpResponse(HTTP_1_1,
-					HttpResponseStatus.OK);
-
-			String uri = request.getUri();
-			if (!uri.startsWith("/apis/")) {
-				sendResourceNotFound(ctx, e);
-				return;
-			}
-			if (uri.endsWith("/")) {
-				uri = uri.substring(0, uri.length() - 1);
-			}
-
-			String serviceName = uri.substring(uri.lastIndexOf("/") + 1);
-
-			//client ip
-			SocketAddress remoteAddress = ctx.getChannel().getRemoteAddress();
-			String ipAddress = remoteAddress.toString().split(":")[0];
-			request.addHeader("Client-IP", ipAddress.substring(1));
-			handleService(serviceName, request, response, os, e);
-		}
-	}
-
 	private void handleService(final String serviceName,
-			final HttpRequest request, final HttpResponse response,
-			final ByteArrayOutputStream os, final MessageEvent e)
+			final FullHttpRequest request, final FullHttpResponse response,
+			final ByteArrayOutputStream os)
 			throws Exception {
 		
-		try {
-			threadpool.execute(new Runnable() {
-				@Override
-				public void run() {
-					try {
-						service(serviceName, request, response, os);
-					} catch (Exception e1) {
-						log.error(e1.getMessage(), e1);
-					}
-
-					if (HttpHeaders.is100ContinueExpected(request)) {
-						send100Continue(e);
-					}
-					if (request.isChunked()) {
-						readingChunks = true;
-					} else {
-						writeResponse(e, response, os);
-					}
-
-				}
-			});
-		} catch (RejectedExecutionException exception) {
-			log.error("server threadpool full,threadpool maxsize is:"
-					+ ((ThreadPoolExecutor) threadpool).getMaximumPoolSize());
-		}
+		service(serviceName, request, response, os);
+		
+//		try {
+//			threadpool.execute(new Runnable() {
+//				@Override
+//				public void run() {
+//					try {
+//						service(serviceName, request, response, os);
+//					} catch (Exception e1) {
+//						log.error(e1.getMessage(), e1);
+//					}
+////					writeResponse(e, response, os);
+//
+//				}
+//			});
+//		} catch (RejectedExecutionException exception) {
+//			log.error("server threadpool full,threadpool maxsize is:"
+//					+ ((ThreadPoolExecutor) threadpool).getMaximumPoolSize());
+//		}
 	}
 
-	/**
-	 * send response
-	 * @param e
-	 * @param response
-	 * @param os
-	 */
-	private void writeResponse(MessageEvent e, HttpResponse response,
-			ByteArrayOutputStream os) {
+//	/**
+//	 * send response
+//	 * @param e
+//	 * @param response
+//	 * @param os
+//	 */
+//	private void writeResponse(FullHttpRequest e, HttpResponse response,
+//			ByteArrayOutputStream os) {
+//
+//		boolean keepAlive = isKeepAlive(request);
+//		ChannelBuffer cb = ChannelBuffers.dynamicBuffer();
+//		cb.writeBytes(os.toByteArray());
+//		response.setContent(cb);
+//
+//		if (keepAlive) {
+//			response.setHeader(CONTENT_LENGTH, response.c()
+//					.readableBytes());
+//		}
+//
+//		ChannelFuture future = e.getChannel().write(response);
+//
+//		if (!keepAlive) {
+//			future.addListener(ChannelFutureListener.CLOSE);
+//		}
+//	}
 
-		boolean keepAlive = isKeepAlive(request);
-		ChannelBuffer cb = ChannelBuffers.dynamicBuffer();
-		cb.writeBytes(os.toByteArray());
-		response.setContent(cb);
-
-		if (keepAlive) {
-			response.setHeader(CONTENT_LENGTH, response.getContent()
-					.readableBytes());
-		}
-
-		ChannelFuture future = e.getChannel().write(response);
-
-		if (!keepAlive) {
-			future.addListener(ChannelFutureListener.CLOSE);
-		}
-	}
-
-	private void send100Continue(MessageEvent e) {
-		HttpResponse response = new DefaultHttpResponse(HTTP_1_1, CONTINUE);
-		ChannelBuffer content1 = request.getContent();
-		if (content1.readable()) {
-			buf.append(content1.toString(CharsetUtil.UTF_8));
-		}
-		ChannelFuture future = e.getChannel().write(response);
-		boolean keepAlive = isKeepAlive(request);
-
-		if (!keepAlive) {
-			future.addListener(ChannelFutureListener.CLOSE);
-		}
-	}
 
 	/**
 	 * Sets the serializer factory.
@@ -191,9 +135,17 @@ public class HettyHandler extends SimpleChannelUpstreamHandler {
 	 * Execute a request. The path-info of the request selects the bean. Once
 	 * the bean's selected, it will be applied.
 	 */
-	public void service(String serviceName, HttpRequest req, HttpResponse res,
+	public void service(String serviceName, FullHttpRequest req, FullHttpResponse res,
 			ByteArrayOutputStream os) {
-		byte[] bytes = req.getContent().array();//get request content
+		byte[] bytes = null;
+		if(req.content().hasArray()){
+			bytes = req.content().array();//get request content
+		}else{
+			bytes = new byte[req.content().readableBytes()];
+			req.content().getBytes(0, bytes);
+		}
+		
+		
 		InputStream is = new ByteArrayInputStream(bytes);
 
 		SerializerFactory serializerFactory = getSerializerFactory();
@@ -202,7 +154,7 @@ public class HettyHandler extends SimpleChannelUpstreamHandler {
 		String[] authLink = getUsernameAndPassword(req);
 		username = authLink[0].equals("")?null:authLink[0];
 		password = authLink[1].equals("")?null:authLink[1];
-		String clientIP = request.getHeader("Client-IP");
+		String clientIP = request.headers().get("Client-IP");
 		RequestWrapper rw = new RequestWrapper(username, password, clientIP, serviceName);
 		
 		
@@ -210,7 +162,7 @@ public class HettyHandler extends SimpleChannelUpstreamHandler {
 	}
 
 	private String[] getUsernameAndPassword(HttpRequest req) {
-		String auths = request.getHeader("Authorization");
+		String auths = request.headers().get("Authorization");
 		if(auths == null){
 			String str[] = {"",""};
 			return str;
@@ -374,14 +326,69 @@ public class HettyHandler extends SimpleChannelUpstreamHandler {
 		return new Hessian2Input(is);
 	}
 
-	private void sendResourceNotFound(ChannelHandlerContext ctx, MessageEvent e) {
-		HttpResponse response = new DefaultHttpResponse(HTTP_1_1,
-				HttpResponseStatus.NOT_FOUND);
-		response.setContent(ChannelBuffers.copiedBuffer("NOT FOUND!",
-				CharsetUtil.UTF_8));
-		response.setHeader(CONTENT_TYPE, "text/plain; charset=UTF-8");
+	private void sendResourceNotFound(ChannelHandlerContext ctx, Object msg) {
+		FullHttpResponse response = new DefaultFullHttpResponse(HTTP_1_1,
+				HttpResponseStatus.NOT_FOUND, Unpooled.copiedBuffer("NOT FOUND!", CharsetUtil.UTF_8));
+		response.headers().set(CONTENT_TYPE, "text/plain; charset=UTF-8");
+		response.headers().set(CONTENT_LENGTH, response.content().readableBytes());
 
 		// Close the connection as soon as the error message is sent.
-		ctx.getChannel().write(response).addListener(ChannelFutureListener.CLOSE);
+		ctx.write(response).addListener(ChannelFutureListener.CLOSE);
+	}
+
+
+	@Override
+	protected void channelRead0(ChannelHandlerContext ctx, Object msg)
+			throws Exception {
+		if (msg instanceof FullHttpRequest) {
+	          HttpRequest req = (HttpRequest) msg;
+
+	          if (is100ContinueExpected(req)) {
+	              ctx.write(new DefaultFullHttpResponse(HTTP_1_1, CONTINUE));
+	          }
+	          boolean keepAlive = isKeepAlive(req);
+
+	          /**
+	           * logic here
+	           */
+			ByteArrayOutputStream os = new ByteArrayOutputStream();
+			FullHttpRequest request = this.request = (FullHttpRequest) msg;
+			FullHttpResponse response = new DefaultFullHttpResponse(HTTP_1_1,
+					HttpResponseStatus.OK, Unpooled.buffer(512));
+
+			String uri = request.getUri();
+			if (!uri.startsWith("/apis/")) {
+				sendResourceNotFound(ctx, msg);
+				return;
+			}
+			if (uri.endsWith("/")) {
+				uri = uri.substring(0, uri.length() - 1);
+			}
+
+			String serviceName = uri.substring(uri.lastIndexOf("/") + 1);
+
+			// client ip
+			SocketAddress remoteAddress = ctx.channel().remoteAddress();
+			String ipAddress = remoteAddress.toString().split(":")[0];
+			request.headers().set("Client-IP", ipAddress.substring(1));
+			handleService(serviceName, request, response, os);
+			
+			
+			ByteBuf cb = Unpooled.buffer();
+			cb.writeBytes(os.toByteArray());
+			response.content().setBytes(cb.readerIndex(), cb);
+			response.headers().set(CONTENT_LENGTH, response.content().readableBytes());
+	
+	          /**
+	           * logic above
+	           */
+
+	          if (!keepAlive) {
+	              ctx.write(response).addListener(ChannelFutureListener.CLOSE);
+	          } else {
+	              response.headers().set(CONNECTION, Values.KEEP_ALIVE);
+	              ctx.write(response);
+	          }
+	      }
 	}
 }

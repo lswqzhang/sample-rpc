@@ -20,11 +20,6 @@
   		<artifactId>commons-lang3</artifactId>
   	</dependency>
   	<dependency>
-  		<groupId>org.jboss.netty</groupId>
-  		<artifactId>netty</artifactId>
-  		<version>3.2.19</version>
-  	</dependency>
-  	<dependency>
   		<groupId>dom4j</groupId>
   		<artifactId>dom4j</artifactId>
   	</dependency>
@@ -62,6 +57,11 @@
   	<dependency>
   		<groupId>org.springframework</groupId>
   		<artifactId>spring</artifactId>
+  	</dependency>
+  	<dependency>
+  		<groupId>io.netty</groupId>
+  		<artifactId>netty-all</artifactId>
+  		<version>4.0.25.Final</version>
   	</dependency>
   </dependencies>
 </project>
