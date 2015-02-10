@@ -44,6 +44,9 @@ public final class Hetty {
 	private int httpListenPort;
 	private int httpsListenPort;
 	private ApplicationContext ctx;
+	private ChannelFuture cf;
+	private EventLoopGroup boss;
+	private EventLoopGroup worker; 
 	
 	public Hetty(){
 		HettyConfig.getInstance().loadPropertyFile("config/server.properties");//default file is this.
@@ -88,23 +91,16 @@ public final class Hetty {
 				TimeUnit.SECONDS, new SynchronousQueue<Runnable>(), threadFactory);
     	
     	
-    	EventLoopGroup boss = new NioEventLoopGroup();
-    	EventLoopGroup worker = new NioEventLoopGroup();
+    	 boss = new NioEventLoopGroup();
+    	 worker = new NioEventLoopGroup();
     	ServerBootstrap httpBootStrap = new ServerBootstrap();
-    	try{
-	    	ChannelFuture cf = httpBootStrap.group(boss, worker)
+    		cf = httpBootStrap.group(boss, worker)
 	    				 .channel(NioServerSocketChannel.class)
 	    				 .childHandler(new HettyServerHandlerInitializer(threadPool))
 	    				 .option(ChannelOption.SO_KEEPALIVE, true)
 	    				 .bind(new InetSocketAddress(httpListenPort));
 	    	
-	    	cf.channel().closeFuture().sync();
-    	}catch (InterruptedException e) {
-			e.printStackTrace();
-		} finally {
-			boss.shutdownGracefully();
-			worker.shutdownGracefully();
-		}
+	    	
     	/*
 		ThreadFactory serverBossTF = new NamedThreadFactory("HETTY-BOSS-");
 		ThreadFactory serverWorkerTF = new NamedThreadFactory("HETTY-WORKER-");
@@ -288,6 +284,15 @@ public final class Hetty {
 	public void start(){
 		init();
 		serverLog();
+		try{
+			cf.channel().closeFuture().sync();
+		}catch(InterruptedException ex){
+			logger.debug(ex.toString());
+		}finally{
+			boss.shutdownGracefully();
+			worker.shutdownGracefully();
+		}
+		
 	}
 	/**
 	 * stop hetty

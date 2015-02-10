@@ -29,7 +29,7 @@ public class HettyServerHandlerInitializer extends ChannelInitializer<Channel> {
 		pipeline.addLast("httpRequestDecoder", new HttpRequestDecoder());
 		pipeline.addLast("httpChunkAggregator", new HttpObjectAggregator(1048576));
 		pipeline.addLast("httpResponseEncoder", new HttpResponseEncoder());
-		pipeline.addLast("deflater", new HttpContentCompressor());
+//		pipeline.addLast("deflater", new HttpContentCompressor());
 		pipeline.addLast("handler", new HettyHandler(threadpool));
 		
 		

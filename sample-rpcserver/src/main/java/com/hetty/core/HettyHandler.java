@@ -9,7 +9,6 @@ import static io.netty.handler.codec.http.HttpResponseStatus.CONTINUE;
 import static io.netty.handler.codec.http.HttpVersion.HTTP_1_1;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
@@ -30,8 +29,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.SocketAddress;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ThreadPoolExecutor;
 
 import org.apache.commons.codec.binary.Base64;
 import org.slf4j.Logger;
@@ -376,7 +373,7 @@ public class HettyHandler extends SimpleChannelInboundHandler<Object> {
 			
 			ByteBuf cb = Unpooled.buffer();
 			cb.writeBytes(os.toByteArray());
-			response.content().setBytes(cb.readerIndex(), cb);
+			response.content().writeBytes(cb);
 			response.headers().set(CONTENT_LENGTH, response.content().readableBytes());
 	
 	          /**
@@ -387,7 +384,7 @@ public class HettyHandler extends SimpleChannelInboundHandler<Object> {
 	              ctx.write(response).addListener(ChannelFutureListener.CLOSE);
 	          } else {
 	              response.headers().set(CONNECTION, Values.KEEP_ALIVE);
-	              ctx.write(response);
+	              ctx.writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);
 	          }
 	      }
 	}
