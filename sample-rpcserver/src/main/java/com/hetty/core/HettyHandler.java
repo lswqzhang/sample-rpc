@@ -28,7 +28,11 @@ import java.io.OutputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.SocketAddress;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadPoolExecutor;
 
 import org.apache.commons.codec.binary.Base64;
 import org.slf4j.Logger;
@@ -58,30 +62,31 @@ public class HettyHandler extends SimpleChannelInboundHandler<Object> {
 		this.threadpool = threadpool;
 	}
 	
-	private void handleService(final String serviceName,
+	private Future<ByteArrayOutputStream> handleService(final String serviceName,
 			final FullHttpRequest request, final FullHttpResponse response,
 			final ByteArrayOutputStream os)
 			throws Exception {
 		
-		service(serviceName, request, response, os);
+		Future<ByteArrayOutputStream> f = null;
+		try {
+			f = threadpool.submit(new Callable<ByteArrayOutputStream>() {
+				@Override
+				public ByteArrayOutputStream call() {
+					ByteArrayOutputStream ret = null;
+					try {
+						ret = service(serviceName, request, response, os);
+					} catch (Exception e1) {
+						log.error(e1.getMessage(), e1);
+					}
+					return ret;
+				}
+			});
+		} catch (RejectedExecutionException exception) {
+			log.error("server threadpool full,threadpool maxsize is:"
+					+ ((ThreadPoolExecutor) threadpool).getMaximumPoolSize());
+		}
 		
-//		try {
-//			threadpool.execute(new Runnable() {
-//				@Override
-//				public void run() {
-//					try {
-//						service(serviceName, request, response, os);
-//					} catch (Exception e1) {
-//						log.error(e1.getMessage(), e1);
-//					}
-////					writeResponse(e, response, os);
-//
-//				}
-//			});
-//		} catch (RejectedExecutionException exception) {
-//			log.error("server threadpool full,threadpool maxsize is:"
-//					+ ((ThreadPoolExecutor) threadpool).getMaximumPoolSize());
-//		}
+		return f;
 	}
 
 //	/**
@@ -132,7 +137,7 @@ public class HettyHandler extends SimpleChannelInboundHandler<Object> {
 	 * Execute a request. The path-info of the request selects the bean. Once
 	 * the bean's selected, it will be applied.
 	 */
-	public void service(String serviceName, FullHttpRequest req, FullHttpResponse res,
+	public ByteArrayOutputStream service(String serviceName, FullHttpRequest req, FullHttpResponse res,
 			ByteArrayOutputStream os) {
 		byte[] bytes = null;
 		if(req.content().hasArray()){
@@ -156,6 +161,8 @@ public class HettyHandler extends SimpleChannelInboundHandler<Object> {
 		
 		
 		invoke(rw, is, os, serializerFactory);
+		
+		return os;
 	}
 
 	private String[] getUsernameAndPassword(HttpRequest req) {
@@ -368,11 +375,11 @@ public class HettyHandler extends SimpleChannelInboundHandler<Object> {
 			SocketAddress remoteAddress = ctx.channel().remoteAddress();
 			String ipAddress = remoteAddress.toString().split(":")[0];
 			request.headers().set("Client-IP", ipAddress.substring(1));
-			handleService(serviceName, request, response, os);
-			
+			Future<ByteArrayOutputStream> f = handleService(serviceName, request, response, os);
+			ByteArrayOutputStream outputOs = f.get();
 			
 			ByteBuf cb = Unpooled.buffer();
-			cb.writeBytes(os.toByteArray());
+			cb.writeBytes(outputOs.toByteArray());
 			response.content().writeBytes(cb);
 			response.headers().set(CONTENT_LENGTH, response.content().readableBytes());
 	
