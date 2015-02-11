@@ -51,6 +51,8 @@ import com.hetty.object.RequestWrapper;
 
 public class HettyHandler extends SimpleChannelInboundHandler<Object> {
 	
+	private int local = 0;
+	
 	private final Logger log = LoggerFactory
 			.getLogger(HettyHandler.class);
 	private FullHttpRequest request;
@@ -346,6 +348,9 @@ public class HettyHandler extends SimpleChannelInboundHandler<Object> {
 	@Override
 	protected void channelRead0(ChannelHandlerContext ctx, Object msg)
 			throws Exception {
+		
+		local ++ ;
+		
 		if (msg instanceof FullHttpRequest) {
 	          HttpRequest req = (HttpRequest) msg;
 
