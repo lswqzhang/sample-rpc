@@ -63,5 +63,9 @@
   		<artifactId>netty-all</artifactId>
   		<version>4.0.25.Final</version>
   	</dependency>
+  	<dependency>
+  		<groupId>junit</groupId>
+  		<artifactId>junit</artifactId>
+  	</dependency>
   </dependencies>
 </project>

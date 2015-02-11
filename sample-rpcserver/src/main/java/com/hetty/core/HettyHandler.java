@@ -11,6 +11,8 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelOutboundHandlerAdapter;
+import io.netty.channel.ChannelPromise;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.FullHttpRequest;
@@ -388,11 +390,12 @@ public class HettyHandler extends SimpleChannelInboundHandler<Object> {
 	           */
 
 	          if (!keepAlive) {
-	              ctx.write(response).addListener(ChannelFutureListener.CLOSE);
+	              ctx.writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);
 	          } else {
 	              response.headers().set(CONNECTION, Values.KEEP_ALIVE);
 	              ctx.writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);
 	          }
 	      }
 	}
+
 }
