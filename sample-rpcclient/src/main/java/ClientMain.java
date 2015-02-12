@@ -14,6 +14,7 @@ public class ClientMain {
 	public static void main(String[] args){
 		ApplicationContext ctx = new ClassPathXmlApplicationContext("config/spring/appcontext-*.xml");
 		final Hello basic = (Hello) ctx.getBean("hello");
-		System.out.println(basic.hello());
+//		System.out.println(basic.hello());
+		System.out.println(basic.hello("nihao"));
 	}
 }

@@ -352,7 +352,16 @@ public class HettyHandler extends SimpleChannelInboundHandler<Object> {
 		local ++ ;
 		
 		if (msg instanceof FullHttpRequest) {
-	          HttpRequest req = (HttpRequest) msg;
+	          FullHttpRequest req = (FullHttpRequest) msg;
+	          ByteBuf tmpByteBuf = req.content();
+	          if(tmpByteBuf.hasArray()){
+	        	  byte[] bytes = tmpByteBuf.array();
+	        	  System.out.println(new String(bytes));
+	          }else{
+	        	  byte[] bytes = new byte[tmpByteBuf.readableBytes()];
+	        	  tmpByteBuf.getBytes(0, bytes);
+	        	  System.out.println(new String(bytes));
+	          }
 
 	          if (is100ContinueExpected(req)) {
 	              ctx.write(new DefaultFullHttpResponse(HTTP_1_1, CONTINUE));
